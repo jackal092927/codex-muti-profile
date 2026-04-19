@@ -1,51 +1,36 @@
-# Codex Muti Profile
+# codex-muti-profile
 
-Shareable multi-profile launchers for `codex` CLI and `Codex.app` on macOS.
+[![Platform](https://img.shields.io/badge/platform-macOS-black)](https://www.apple.com/macos/)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Status](https://img.shields.io/badge/status-validated-success)](https://github.com/jackal092927/codex-muti-profile)
 
-This repository packages the local workflow that was validated end-to-end:
+Multi-profile launchers for `codex` CLI and `Codex.app` on macOS.
 
-- `codex` CLI launches with isolated `CODEX_HOME` directories per account
-- `Codex.app` launches as cloned app bundles with isolated:
-  - `CODEX_HOME`
-  - Electron `userData`
-  - bundle identifiers
-- desktop clones are patched so multiple app instances can stay open at once
-- optional custom icons can be installed per account
+This project makes it practical to keep separate Codex identities such as `personal`, `work`, or `lab` without constantly logging in and out. It supports both:
 
-## What It Solves
+- `codex` CLI profiles isolated by `CODEX_HOME`
+- `Codex.app` clones isolated by both `CODEX_HOME` and Electron `userData`
 
-Codex already supports `CODEX_HOME`, which is enough to isolate CLI login state. The desktop app needs more work:
+## Why This Exists
 
-- separate app bundle clones
-- separate Electron `userData`
-- runtime app name / Dock badge overrides
-- a bypass for Electron's single-instance lock
-- a fresh `ElectronAsarIntegrity` hash after patching `app.asar`
+For the CLI, separate `CODEX_HOME` directories are enough to keep auth, config, and state apart.
 
-This tool automates those steps.
+For the desktop app, that is not enough. `Codex.app` also stores state in Electron-managed app data and normally enforces a single-instance lock. That means a real multi-profile setup needs more than shell wrappers.
 
-## Requirements
+`codex-muti-profile` automates the missing pieces:
 
-- macOS
-- `python3`
-- `node`
-- `codesign`
-- For custom PNG icons:
-  - `sips`
-  - `iconutil`
+- per-profile `CODEX_HOME`
+- per-profile Electron `userData`
+- separate cloned `.app` bundles
+- per-clone bundle identifiers
+- optional custom app icons
+- runtime app labels and Dock badges
+- patched multi-instance behavior for desktop clones
+- regenerated `ElectronAsarIntegrity` after patching `app.asar`
 
-The desktop app flow is macOS-specific. The CLI flow is simpler and mostly relies on `CODEX_HOME`.
+## What You Get
 
-## Quick Start
-
-Install both CLI and desktop launchers for two accounts:
-
-```bash
-./bin/codex-muti-profile install personal
-./bin/codex-muti-profile install work
-```
-
-Then launch them with:
+After installing `personal` and `work`, you can launch:
 
 ```bash
 codex-personal
@@ -54,16 +39,45 @@ codex-app-personal
 codex-app-work
 ```
 
-## Install An Account
+And you get isolated state like:
 
-If you want both CLI and desktop launchers:
+| Mode | Isolation |
+| --- | --- |
+| CLI | `~/.codex-personal`, `~/.codex-work` |
+| Desktop app | `~/.codex-<profile>` plus `~/Library/Application Support/Codex-<Profile>` |
+
+## Support Matrix
+
+| Capability | CLI | Desktop app |
+| --- | --- | --- |
+| Separate login state | Yes | Yes |
+| Separate config/state directories | Yes | Yes |
+| Separate Electron app data | N/A | Yes |
+| Parallel instances | Usually yes | Yes, via patched clones |
+| Custom icon per profile | N/A | Yes |
+
+## Requirements
+
+- macOS
+- `python3`
+- `node`
+- `codesign`
+- optional, for PNG icon conversion:
+  - `sips`
+  - `iconutil`
+
+The desktop flow is macOS-specific. The CLI flow is simpler and mostly depends on `CODEX_HOME`.
+
+## Quick Start
+
+Install both CLI and desktop profiles:
 
 ```bash
 ./bin/codex-muti-profile install personal
 ./bin/codex-muti-profile install work
 ```
 
-This writes:
+This creates:
 
 - `~/.local/bin/codex-account-home`
 - `~/.local/bin/codex-personal`
@@ -73,34 +87,7 @@ This writes:
 - `~/Applications/Codex Personal.app`
 - `~/Applications/Codex Work.app`
 
-CLI-only:
-
-```bash
-./bin/codex-muti-profile install lab --cli
-```
-
-Desktop-only:
-
-```bash
-./bin/codex-muti-profile install lab --app
-```
-
-## Custom App Icons
-
-Use a PNG or ICNS for the cloned desktop app:
-
-```bash
-./bin/codex-muti-profile install personal \
-  --app \
-  --force \
-  --icon-png ~/Downloads/exports/codex-pp_05_bracketed_1024.png
-```
-
-If the Dock keeps an old icon cached, remove the cloned app from the Dock and pin it again once.
-
-## Generated Launchers
-
-After installation:
+Then launch:
 
 ```bash
 codex-personal
@@ -109,26 +96,44 @@ codex-app-personal
 codex-app-work
 ```
 
-The CLI launchers isolate:
+## Install Examples
 
-- `~/.codex-personal`
-- `~/.codex-work`
+Install CLI and app together:
 
-The desktop launchers isolate both:
+```bash
+./bin/codex-muti-profile install personal
+```
 
-- `~/.codex-<account>`
-- `~/Library/Application Support/Codex-<Account>`
+Install CLI only:
 
-## Why The Desktop App Needs Patching
+```bash
+./bin/codex-muti-profile install lab --cli
+```
 
-`CODEX_HOME` is enough for CLI account isolation, but the desktop app also keeps state in Electron-managed app data and ships with a single-instance lock. To make `Codex Personal.app` and `Codex Work.app` coexist cleanly, this tool:
+Install desktop app only:
 
-- clones the upstream app bundle
-- patches the Electron bootstrap
-- sets per-account `CODEX_ELECTRON_USER_DATA_PATH`
-- enables per-clone app labels and Dock badges
-- recomputes `ElectronAsarIntegrity`
-- re-signs the cloned bundle locally
+```bash
+./bin/codex-muti-profile install lab --app
+```
+
+Install a profile with a custom Dock icon:
+
+```bash
+./bin/codex-muti-profile install personal \
+  --app \
+  --force \
+  --icon-png ~/Downloads/exports/codex-pp_05_bracketed_1024.png
+```
+
+Use a custom app label and bundle id:
+
+```bash
+./bin/codex-muti-profile install work \
+  --app \
+  --label "Codex Work" \
+  --bundle-id local.codex.work.app \
+  --dock-badge W
+```
 
 ## How It Works
 
@@ -136,76 +141,93 @@ The desktop launchers isolate both:
 
 The generated `codex-account-home` helper:
 
-- creates `~/.codex-<account>`
+- creates `~/.codex-<profile>`
 - symlinks low-churn shared assets from `~/.codex`
-  - `config.toml`
-  - `plugins`
-  - `skills`
-  - `mcp-servers`
-  - other static support directories
 - exports `CODEX_HOME`
+- launches `codex` in that isolated profile
 
-### Desktop App
+Shared static items currently include:
 
-For each account:
+- `config.toml`
+- `AGENTS.md`
+- `plugins`
+- `skills`
+- `mcp-servers`
+- `rules`
+- `tools`
+- `vendor_imports`
 
-1. Clone `/Applications/Codex.app` into `~/Applications/Codex <Account>.app`
-2. Extract `Contents/Resources/app.asar`
-3. Patch Electron bootstrap so the clone can:
+### Desktop app
+
+For each profile, the installer:
+
+1. clones `/Applications/Codex.app` into `~/Applications/Codex <Profile>.app`
+2. extracts `Contents/Resources/app.asar`
+3. patches Electron bootstrap so the clone can:
    - read `CODEX_ELECTRON_APP_NAME`
    - read `CODEX_ELECTRON_DOCK_BADGE`
-   - skip the single-instance lock when `CODEX_ELECTRON_ALLOW_MULTI_INSTANCE=1`
-4. Repack `app.asar`
-5. Recompute the ASAR header hash used by `ElectronAsarIntegrity`
-6. Update `Info.plist`
-7. Re-sign the app locally with ad-hoc signing
+   - honor `CODEX_ELECTRON_USER_DATA_PATH`
+   - bypass the single-instance lock when `CODEX_ELECTRON_ALLOW_MULTI_INSTANCE=1`
+4. repacks `app.asar`
+5. recomputes the ASAR header hash used by `ElectronAsarIntegrity`
+6. updates `Info.plist`
+7. re-signs the cloned app locally with ad-hoc signing
+
+Important: the original `/Applications/Codex.app` is not modified in place. This tool patches only cloned app bundles.
+
+## Output Paths
+
+For a profile named `personal`, the defaults are:
+
+- CLI state: `~/.codex-personal`
+- desktop app state: `~/.codex-personal`
+- Electron app data: `~/Library/Application Support/Codex-Personal`
+- desktop clone: `~/Applications/Codex Personal.app`
+- launchers: `~/.local/bin/codex-personal` and `~/.local/bin/codex-app-personal`
+
+## Validation
+
+This workflow was validated end-to-end on a real local Codex installation:
+
+- CLI wrappers correctly isolated `CODEX_HOME`
+- cloned desktop apps launched from separate `.app` bundles
+- Electron helper processes used separate `--user-data-dir` paths
+- per-clone bundle identifiers resolved correctly
+- profile-specific app labels and Dock behavior were verified locally
 
 ## Limitations
 
-- Tested against the current Codex desktop bundle layout used in `26.415.x`
-- The desktop patch assumes the upstream app still keeps its bootstrap logic in `.vite/build/bootstrap.js`
-- When OpenAI ships a major desktop-app packaging change, rerun validation before trusting the patcher
-- Desktop clones are re-signed locally, so macOS may require a one-time manual open
-- The helper scripts embed launch paths under `~/.local/bin` and `~/Applications`
-
-## Validation Status
-
-This repository was smoke-tested against a real local Codex installation:
-
-- CLI wrappers correctly isolated `CODEX_HOME`
-- desktop clones launched from separate `.app` bundles
-- Electron helper processes used separate `--user-data-dir` paths
-- per-clone bundle identifiers and launcher paths resolved correctly
+- tested against the current Codex desktop bundle layout in `26.415.x`
+- assumes the upstream app still keeps bootstrap logic in `.vite/build/bootstrap.js`
+- if OpenAI changes desktop packaging significantly, the patcher may need updates
+- cloned apps are re-signed locally, so macOS may require a one-time manual open
+- if the Dock keeps an old icon cached, remove the cloned app from the Dock and pin it again once
 
 ## Repository Layout
 
 - `bin/codex-muti-profile`
   - main installer
 - `lib/extract_asar.mjs`
-  - extract an ASAR archive without external npm install
+  - extract an ASAR archive without an npm install step
 - `lib/pack_asar.mjs`
   - repack an ASAR archive
 - `lib/hash_asar_header.mjs`
   - compute the header hash required by `ElectronAsarIntegrity`
 - `lib/asar_vendor`
-  - vendored subset of `@electron/asar` under MIT license
+  - vendored subset of `@electron/asar`
 
 See [NOTICE.md](NOTICE.md) for third-party vendored code details.
 
-## GitHub Sharing Notes
+## Notes
 
-This directory is already repo-ready. A typical publish flow is:
+- This is an independent utility and is not affiliated with OpenAI.
+- The project name intentionally follows the repository name `codex-muti-profile`.
+
+## Publish / Fork
+
+If you want to publish your own copy:
 
 ```bash
+git clone https://github.com/jackal092927/codex-muti-profile.git
 cd codex-muti-profile
-git init -b main
-git add .
-git commit -m "Initial release"
-```
-
-Then create a GitHub repo and push it:
-
-```bash
-git remote add origin git@github.com:<you>/codex-muti-profile.git
-git push -u origin main
 ```
