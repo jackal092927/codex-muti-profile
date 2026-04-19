@@ -1,6 +1,6 @@
-# Codex Multi-Account
+# Codex Muti Profile
 
-Shareable multi-account launchers for `codex` CLI and `Codex.app` on macOS.
+Shareable multi-profile launchers for `codex` CLI and `Codex.app` on macOS.
 
 This repository packages the local workflow that was validated end-to-end:
 
@@ -41,8 +41,8 @@ The desktop app flow is macOS-specific. The CLI flow is simpler and mostly relie
 Install both CLI and desktop launchers for two accounts:
 
 ```bash
-./bin/codex-multi-account install personal
-./bin/codex-multi-account install work
+./bin/codex-muti-profile install personal
+./bin/codex-muti-profile install work
 ```
 
 Then launch them with:
@@ -59,8 +59,8 @@ codex-app-work
 If you want both CLI and desktop launchers:
 
 ```bash
-./bin/codex-multi-account install personal
-./bin/codex-multi-account install work
+./bin/codex-muti-profile install personal
+./bin/codex-muti-profile install work
 ```
 
 This writes:
@@ -76,13 +76,13 @@ This writes:
 CLI-only:
 
 ```bash
-./bin/codex-multi-account install lab --cli
+./bin/codex-muti-profile install lab --cli
 ```
 
 Desktop-only:
 
 ```bash
-./bin/codex-multi-account install lab --app
+./bin/codex-muti-profile install lab --app
 ```
 
 ## Custom App Icons
@@ -90,7 +90,7 @@ Desktop-only:
 Use a PNG or ICNS for the cloned desktop app:
 
 ```bash
-./bin/codex-multi-account install personal \
+./bin/codex-muti-profile install personal \
   --app \
   --force \
   --icon-png ~/Downloads/exports/codex-pp_05_bracketed_1024.png
@@ -179,7 +179,7 @@ This repository was smoke-tested against a real local Codex installation:
 
 ## Repository Layout
 
-- `bin/codex-multi-account`
+- `bin/codex-muti-profile`
   - main installer
 - `lib/extract_asar.mjs`
   - extract an ASAR archive without external npm install
@@ -197,7 +197,7 @@ See [NOTICE.md](NOTICE.md) for third-party vendored code details.
 This directory is already repo-ready. A typical publish flow is:
 
 ```bash
-cd codex-multi-account
+cd codex-muti-profile
 git init -b main
 git add .
 git commit -m "Initial release"
@@ -206,6 +206,6 @@ git commit -m "Initial release"
 Then create a GitHub repo and push it:
 
 ```bash
-git remote add origin git@github.com:<you>/codex-multi-account.git
+git remote add origin git@github.com:<you>/codex-muti-profile.git
 git push -u origin main
 ```

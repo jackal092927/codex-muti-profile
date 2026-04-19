@@ -466,8 +466,8 @@ def install_account(args: argparse.Namespace) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="codex-multi-account",
-        description="Install shareable multi-account launchers for Codex CLI and Codex desktop app.",
+        prog="codex-muti-profile",
+        description="Install shareable multi-profile launchers for Codex CLI and Codex desktop app.",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
