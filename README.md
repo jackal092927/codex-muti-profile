@@ -4,6 +4,8 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/status-validated-success)](https://github.com/jackal092927/codex-muti-profile)
 
+![codex-muti-profile demo](./assets/hero.svg)
+
 Multi-profile launchers for `codex` CLI and `Codex.app` on macOS.
 
 This project makes it practical to keep separate Codex identities such as `personal`, `work`, or `lab` without constantly logging in and out. It supports both:

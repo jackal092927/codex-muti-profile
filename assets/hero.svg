@@ -1,0 +1,87 @@
+<svg width="1400" height="860" viewBox="0 0 1400 860" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="82" y1="48" x2="1318" y2="812" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#08111F"/>
+      <stop offset="0.55" stop-color="#0E1C34"/>
+      <stop offset="1" stop-color="#111827"/>
+    </linearGradient>
+    <linearGradient id="card" x1="214" y1="166" x2="1187" y2="727" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#101A2B"/>
+      <stop offset="1" stop-color="#0B1422"/>
+    </linearGradient>
+    <linearGradient id="accentBlue" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#5DB6FF"/>
+      <stop offset="1" stop-color="#2D8CFF"/>
+    </linearGradient>
+    <linearGradient id="accentPink" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#FF85C6"/>
+      <stop offset="1" stop-color="#FF4D94"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="18" stdDeviation="20" flood-color="#020617" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <rect width="1400" height="860" rx="28" fill="url(#bg)"/>
+  <circle cx="242" cy="160" r="168" fill="#12243D" fill-opacity="0.58"/>
+  <circle cx="1204" cy="114" r="148" fill="#1A2E53" fill-opacity="0.42"/>
+  <circle cx="1118" cy="762" r="196" fill="#101D34" fill-opacity="0.66"/>
+
+  <rect x="56" y="52" width="1288" height="756" rx="30" fill="url(#card)" stroke="#22314D"/>
+
+  <rect x="92" y="88" width="210" height="34" rx="17" fill="#0C1728" stroke="#22314D"/>
+  <text x="197" y="110" fill="#AAB9D4" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="16" text-anchor="middle">macOS • CLI + Desktop</text>
+
+  <text x="92" y="185" fill="white" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="54" font-weight="700">codex-muti-profile</text>
+  <text x="92" y="225" fill="#B3C2DD" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="24">Parallel Codex profiles for CLI and Codex.app without repeated login/logout.</text>
+
+  <rect x="92" y="264" width="1216" height="1" fill="#22314D"/>
+
+  <rect x="106" y="302" width="560" height="382" rx="26" fill="#0B1525" stroke="#263754" filter="url(#shadow)"/>
+  <text x="138" y="346" fill="white" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="28" font-weight="700">CLI Profiles</text>
+  <text x="138" y="375" fill="#98A9C8" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="18">Isolated by CODEX_HOME with shared static assets linked from ~/.codex.</text>
+
+  <rect x="138" y="412" width="236" height="96" rx="20" fill="#12233B" stroke="#29517F"/>
+  <rect x="154" y="430" width="42" height="42" rx="12" fill="url(#accentBlue)"/>
+  <text x="175" y="457" fill="white" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="20" font-weight="700" text-anchor="middle">W</text>
+  <text x="214" y="447" fill="white" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="24">codex-work</text>
+  <text x="214" y="474" fill="#A7B8D5" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16">CODEX_HOME=~/.codex-work</text>
+
+  <rect x="392" y="412" width="236" height="96" rx="20" fill="#26142A" stroke="#7A2E5D"/>
+  <rect x="408" y="430" width="42" height="42" rx="12" fill="url(#accentPink)"/>
+  <text x="429" y="457" fill="white" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="20" font-weight="700" text-anchor="middle">P</text>
+  <text x="468" y="447" fill="white" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="24">codex-personal</text>
+  <text x="468" y="474" fill="#DAB5CA" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16">CODEX_HOME=~/.codex-personal</text>
+
+  <path d="M256 525V552C256 565 267 576 280 576H484C497 576 508 587 508 600V618" stroke="#3C557B" stroke-width="4" stroke-linecap="round"/>
+  <path d="M510 525V552C510 565 499 576 486 576H282C269 576 258 587 258 600V618" stroke="#5A3D61" stroke-width="4" stroke-linecap="round"/>
+  <rect x="258" y="620" width="250" height="42" rx="21" fill="#0E1C31" stroke="#2A4165"/>
+  <text x="383" y="646" fill="#B9C6DC" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="17" text-anchor="middle">Shared plugins, skills, MCP config from ~/.codex</text>
+
+  <rect x="734" y="302" width="560" height="382" rx="26" fill="#0B1525" stroke="#263754" filter="url(#shadow)"/>
+  <text x="766" y="346" fill="white" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="28" font-weight="700">Desktop App Profiles</text>
+  <text x="766" y="375" fill="#98A9C8" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="18">Cloned Codex.app bundles with separate Electron userData and patched multi-instance behavior.</text>
+
+  <rect x="940" y="412" width="146" height="86" rx="20" fill="#102038" stroke="#2A436B"/>
+  <text x="1013" y="448" fill="white" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="24" font-weight="700" text-anchor="middle">Codex.app</text>
+  <text x="1013" y="474" fill="#9CB0D0" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="15" text-anchor="middle">Upstream app</text>
+
+  <path d="M1013 510V546" stroke="#55739E" stroke-width="4" stroke-linecap="round"/>
+  <path d="M1013 546L903 578" stroke="#55739E" stroke-width="4" stroke-linecap="round"/>
+  <path d="M1013 546L1123 578" stroke="#55739E" stroke-width="4" stroke-linecap="round"/>
+
+  <rect x="780" y="580" width="240" height="104" rx="22" fill="#12233B" stroke="#29517F"/>
+  <rect x="798" y="598" width="40" height="40" rx="12" fill="url(#accentBlue)"/>
+  <text x="818" y="624" fill="white" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="20" font-weight="700" text-anchor="middle">W</text>
+  <text x="858" y="617" fill="white" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="22">Codex Work.app</text>
+  <text x="858" y="644" fill="#A7B8D5" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14">~/Library/Application Support/Codex-Work</text>
+
+  <rect x="1008" y="580" width="240" height="104" rx="22" fill="#26142A" stroke="#7A2E5D"/>
+  <rect x="1026" y="598" width="40" height="40" rx="12" fill="url(#accentPink)"/>
+  <text x="1046" y="624" fill="white" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="20" font-weight="700" text-anchor="middle">P</text>
+  <text x="1086" y="617" fill="white" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="22">Codex Personal.app</text>
+  <text x="1086" y="644" fill="#DAB5CA" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14">~/Library/Application Support/Codex-Personal</text>
+
+  <rect x="92" y="724" width="1216" height="54" rx="20" fill="#0A1322" stroke="#22314D"/>
+  <text x="700" y="757" fill="#D6E0F2" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="22" text-anchor="middle">One machine. Multiple Codex profiles. CLI and desktop kept apart on purpose.</text>
+</svg>
