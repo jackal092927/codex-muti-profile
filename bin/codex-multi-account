@@ -1,0 +1,503 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import os
+import plistlib
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+LIB_DIR = REPO_ROOT / "lib"
+EXTRACT_ASAR = LIB_DIR / "extract_asar.mjs"
+PACK_ASAR = LIB_DIR / "pack_asar.mjs"
+HASH_ASAR = LIB_DIR / "hash_asar_header.mjs"
+STATIC_SHARED_ITEMS = [
+    "config.toml",
+    "AGENTS.md",
+    "plugins",
+    "skills",
+    "mcp-servers",
+    "rules",
+    "tools",
+    "vendor_imports",
+]
+
+
+def fail(message: str) -> "NoReturn":
+    print(f"error: {message}", file=sys.stderr)
+    raise SystemExit(1)
+
+
+def run(cmd: list[str], *, capture: bool = False) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        cmd,
+        check=True,
+        text=True,
+        capture_output=capture,
+    )
+
+
+def require_tool(name: str) -> str:
+    path = shutil.which(name)
+    if not path:
+        fail(f"required tool not found in PATH: {name}")
+    return path
+
+
+def slugify(value: str) -> str:
+    slug = re.sub(r"[^A-Za-z0-9]+", "-", value.strip().lower()).strip("-")
+    return slug or "account"
+
+
+def titleize(value: str) -> str:
+    parts = [part for part in re.split(r"[^A-Za-z0-9]+", value.strip()) if part]
+    return " ".join(part.capitalize() for part in parts) or "Account"
+
+
+def default_label(account: str) -> str:
+    return f"Codex {titleize(account)}"
+
+
+def default_bundle_id(account: str) -> str:
+    return f"local.codex.{slugify(account)}.app"
+
+
+def default_dock_badge(account: str) -> str:
+    for char in account:
+        if char.isalnum():
+            return char.upper()
+    return "C"
+
+
+def support_name_from_label(label: str) -> str:
+    cleaned = re.sub(r"[^A-Za-z0-9]+", "-", label.strip()).strip("-")
+    return cleaned or "Codex-Account"
+
+
+def copy_app(source: Path, dest: Path) -> None:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if dest.exists():
+        shutil.rmtree(dest)
+    cow = subprocess.run(["cp", "-cR", str(source), str(dest)], text=True)
+    if cow.returncode != 0:
+        run(["cp", "-R", str(source), str(dest)])
+
+
+def write_text_executable(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+    path.chmod(0o755)
+
+
+def helper_script_contents(bin_dir: Path) -> str:
+    helper_path = bin_dir / "codex-account-home"
+    return f"""#!/bin/sh
+set -eu
+
+if [ "$#" -lt 6 ]; then
+  echo "Usage: {helper_path.name} <cli|app> <account-name> <app-support-name> <app-display-name> <dock-badge> <command> [args...]" >&2
+  exit 2
+fi
+
+mode="$1"
+shift
+account_name="$1"
+shift
+app_support_name="$1"
+shift
+app_display_name="$1"
+shift
+dock_badge="$1"
+shift
+command="$1"
+shift
+
+account_slug="$(printf '%s' "$account_name" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-')"
+account_slug="${{account_slug#-}}"
+account_slug="${{account_slug%-}}"
+[ -n "$account_slug" ] || account_slug="account"
+
+shared_home="${{CODEX_SHARED_HOME:-$HOME/.codex}}"
+account_home_root="${{CODEX_ACCOUNT_HOME_ROOT:-$HOME}}"
+app_support_root="${{CODEX_APP_SUPPORT_ROOT:-$HOME/Library/Application Support}}"
+account_home="$account_home_root/.codex-$account_slug"
+user_data_dir="$app_support_root/$app_support_name"
+
+link_if_missing() {{
+  src="$1"
+  dst="$2"
+  if [ ! -e "$src" ]; then
+    return 0
+  fi
+  if [ -e "$dst" ] || [ -L "$dst" ]; then
+    return 0
+  fi
+  ln -s "$src" "$dst" 2>/dev/null || {{
+    if [ -e "$dst" ] || [ -L "$dst" ]; then
+      return 0
+    fi
+    return 1
+  }}
+}}
+
+bootstrap_home() {{
+  mkdir -p "$account_home"
+  if [ "$mode" = app ]; then
+    mkdir -p "$user_data_dir"
+  fi
+  link_if_missing "$shared_home/config.toml" "$account_home/config.toml"
+  link_if_missing "$shared_home/AGENTS.md" "$account_home/AGENTS.md"
+  link_if_missing "$shared_home/plugins" "$account_home/plugins"
+  link_if_missing "$shared_home/skills" "$account_home/skills"
+  link_if_missing "$shared_home/mcp-servers" "$account_home/mcp-servers"
+  link_if_missing "$shared_home/rules" "$account_home/rules"
+  link_if_missing "$shared_home/tools" "$account_home/tools"
+  link_if_missing "$shared_home/vendor_imports" "$account_home/vendor_imports"
+}}
+
+bootstrap_home
+export CODEX_HOME="$account_home"
+
+if [ "$mode" = app ]; then
+  export CODEX_ELECTRON_USER_DATA_PATH="$user_data_dir"
+  export CODEX_ELECTRON_APP_NAME="$app_display_name"
+  export CODEX_ELECTRON_DOCK_BADGE="$dock_badge"
+  unset CODEX_ELECTRON_APP_ICON_PATH
+fi
+
+exec "$command" "$@"
+"""
+
+
+def cli_launcher_contents(helper: Path, account: str, support_name: str, label: str, dock_badge: str) -> str:
+    return f"""#!/bin/sh
+set -eu
+
+exec "{helper}" cli "{slugify(account)}" "{support_name}" "{label}" "{dock_badge}" codex "$@"
+"""
+
+
+def app_launcher_contents(helper: Path, account: str, support_name: str, label: str, dock_badge: str, app_path: Path) -> str:
+    return f"""#!/bin/sh
+set -eu
+
+exec "{helper}" app "{slugify(account)}" "{support_name}" "{label}" "{dock_badge}" "{app_path / 'Contents' / 'MacOS' / 'Codex'}" "$@"
+"""
+
+
+def patch_bootstrap(bootstrap_path: Path) -> None:
+    text = bootstrap_path.read_text(encoding="utf-8")
+
+    if "CODEX_ELECTRON_ALLOW_MULTI_INSTANCE" in text:
+        return
+
+    helper_anchor = (
+        "function g({appDataPath:t,buildFlavor:r,env:i}){let a=i.CODEX_ELECTRON_USER_DATA_PATH?.trim();"
+        "if(a)return(0,n.resolve)(a);let o=(0,n.join)(t,e.Pr(r)),s=i.CODEX_ELECTRON_AGENT_RUN_ID?.trim()||null;"
+        "return r===`agent`&&s!=null?(0,n.join)(o,`agent`,s):o}var _={"
+    )
+    helper_patch = (
+        "function g({appDataPath:t,buildFlavor:r,env:i}){let a=i.CODEX_ELECTRON_USER_DATA_PATH?.trim();"
+        "if(a)return(0,n.resolve)(a);let o=(0,n.join)(t,e.Pr(r)),s=i.CODEX_ELECTRON_AGENT_RUN_ID?.trim()||null;"
+        "return r===`agent`&&s!=null?(0,n.join)(o,`agent`,s):o}"
+        "function w(){let e=process.env.CODEX_ELECTRON_APP_NAME?.trim();return e||null}"
+        "function C(){let e=process.env.CODEX_ELECTRON_DOCK_BADGE?.trim();return e||null}"
+        "var _={"
+    )
+    if "function w(){" not in text:
+        if helper_anchor not in text:
+            fail(f"unsupported bootstrap format in {bootstrap_path}")
+        text = text.replace(helper_anchor, helper_patch, 1)
+
+    stock_name_anchor = (
+        "var y=process.platform===`darwin`,b=e.d.resolve();t.app.setName(e.Pr(b)),"
+        "t.app.setPath(`userData`,g({appDataPath:t.app.getPath(`appData`),buildFlavor:b,env:process.env})),"
+    )
+    stock_name_patch = (
+        "var y=process.platform===`darwin`,b=e.d.resolve(),N=w();t.app.setName(N??e.Pr(b)),"
+        "t.app.setPath(`userData`,g({appDataPath:t.app.getPath(`appData`),buildFlavor:b,env:process.env})),"
+    )
+    if "N=w();" not in text:
+        if stock_name_anchor not in text:
+            fail(f"unable to patch app name override in {bootstrap_path}")
+        text = text.replace(stock_name_anchor, stock_name_patch, 1)
+
+    single_instance_anchor = (
+        "var x=e.n({isMacOS:y,isPackaged:t.app.isPackaged});"
+        "if(!(!x||t.app.requestSingleInstanceLock()))"
+    )
+    single_instance_patch = (
+        "var x=e.n({isMacOS:y,isPackaged:t.app.isPackaged}),"
+        "A=process.env.CODEX_ELECTRON_ALLOW_MULTI_INSTANCE?.trim(),"
+        "k=A===`1`||A===`true`;"
+        "if(!(!x||k||t.app.requestSingleInstanceLock()))"
+    )
+    if "CODEX_ELECTRON_ALLOW_MULTI_INSTANCE" not in text:
+        if single_instance_anchor not in text:
+            fail(f"unable to patch single-instance lock in {bootstrap_path}")
+        text = text.replace(single_instance_anchor, single_instance_patch, 1)
+
+    second_instance_anchor = "let n=e.i(b);x&&t.app.on(`second-instance`,(e,t)=>{n.queueSecondInstanceArgs(t)}),"
+    second_instance_patch = "let n=e.i(b);x&&!k&&t.app.on(`second-instance`,(e,t)=>{n.queueSecondInstanceArgs(t)}),"
+    if second_instance_patch not in text:
+        if second_instance_anchor not in text:
+            fail(f"unable to patch second-instance handler in {bootstrap_path}")
+        text = text.replace(second_instance_anchor, second_instance_patch, 1)
+
+    when_ready_anchor = "t.app.whenReady().then(async()=>{let{desktopSentry:r,sparkleManager:i}=n;"
+    when_ready_patch = "t.app.whenReady().then(async()=>{if(y){let e=C();e&&t.app.dock?.setBadge(e)}let{desktopSentry:r,sparkleManager:i}=n;"
+    if "t.app.dock?.setBadge" not in text:
+        if when_ready_anchor not in text:
+            fail(f"unable to patch dock badge hook in {bootstrap_path}")
+        text = text.replace(when_ready_anchor, when_ready_patch, 1)
+
+    bootstrap_path.write_text(text, encoding="utf-8")
+
+
+def run_node(script: Path, *args: str, capture: bool = False) -> str:
+    node = require_tool("node")
+    completed = run([node, str(script), *args], capture=capture)
+    return completed.stdout.strip() if capture else ""
+
+
+def patch_info_plist(
+    plist_path: Path,
+    *,
+    bundle_id: str,
+    label: str,
+    user_data_dir: Path,
+    account_home: Path,
+    header_hash: str,
+    dock_badge: str,
+) -> None:
+    with plist_path.open("rb") as fh:
+        data = plistlib.load(fh)
+
+    data["CFBundleIdentifier"] = bundle_id
+    data["CFBundleDisplayName"] = "Codex"
+    data["CFBundleName"] = "Codex"
+    data["CFBundleIconFile"] = "electron.icns"
+    data.pop("CFBundleIconName", None)
+
+    url_types = data.get("CFBundleURLTypes")
+    if isinstance(url_types, list) and url_types:
+        url_types[0]["CFBundleURLName"] = label
+    else:
+        data["CFBundleURLTypes"] = [{"CFBundleURLName": label, "CFBundleURLSchemes": ["codex"]}]
+
+    env = data.get("LSEnvironment") or {}
+    env["CODEX_ELECTRON_ALLOW_MULTI_INSTANCE"] = "1"
+    env["CODEX_ELECTRON_APP_NAME"] = label
+    env["CODEX_ELECTRON_DOCK_BADGE"] = dock_badge
+    env["CODEX_ELECTRON_USER_DATA_PATH"] = str(user_data_dir)
+    env["CODEX_HOME"] = str(account_home)
+    env["MallocNanoZone"] = "0"
+    env.pop("CODEX_ELECTRON_APP_ICON_PATH", None)
+    data["LSEnvironment"] = env
+
+    data["ElectronAsarIntegrity"] = {
+        "Resources/app.asar": {
+            "algorithm": "SHA256",
+            "hash": header_hash,
+        }
+    }
+
+    with plist_path.open("wb") as fh:
+        plistlib.dump(data, fh, sort_keys=False)
+
+
+def install_icon(app_path: Path, icon_png: Path | None, icon_icns: Path | None) -> None:
+    if not icon_png and not icon_icns:
+        return
+
+    app_icon = app_path / "Contents" / "Resources" / "electron.icns"
+    if icon_icns:
+        shutil.copy2(icon_icns, app_icon)
+        return
+
+    require_tool("sips")
+    require_tool("iconutil")
+
+    with tempfile.TemporaryDirectory(prefix="codex-iconset-") as tmp:
+        iconset = Path(tmp) / "App.iconset"
+        iconset.mkdir()
+        sizes = {
+            "icon_16x16.png": 16,
+            "icon_16x16@2x.png": 32,
+            "icon_32x32.png": 32,
+            "icon_32x32@2x.png": 64,
+            "icon_128x128.png": 128,
+            "icon_128x128@2x.png": 256,
+            "icon_256x256.png": 256,
+            "icon_256x256@2x.png": 512,
+            "icon_512x512.png": 512,
+            "icon_512x512@2x.png": 1024,
+        }
+        for name, size in sizes.items():
+            out = iconset / name
+            run(["sips", "-z", str(size), str(size), str(icon_png), "--out", str(out)])
+        generated_icns = Path(tmp) / "icon.icns"
+        run(["iconutil", "-c", "icns", str(iconset), "-o", str(generated_icns)])
+        shutil.copy2(generated_icns, app_icon)
+
+
+def patch_app_clone(
+    *,
+    app_path: Path,
+    bundle_id: str,
+    label: str,
+    account: str,
+    header_hash_out: list[str],
+    dock_badge: str,
+    icon_png: Path | None,
+    icon_icns: Path | None,
+) -> None:
+    resources = app_path / "Contents" / "Resources"
+    asar = resources / "app.asar"
+    asar_backup = resources / "app.asar.orig"
+    plist_path = app_path / "Contents" / "Info.plist"
+
+    if not asar_backup.exists():
+        shutil.copy2(asar, asar_backup)
+
+    with tempfile.TemporaryDirectory(prefix="codex-asar-") as tmp:
+        unpack_dir = Path(tmp) / "app"
+        run_node(EXTRACT_ASAR, str(asar_backup), str(unpack_dir))
+        bootstrap = unpack_dir / ".vite" / "build" / "bootstrap.js"
+        if not bootstrap.exists():
+            fail(f"bootstrap.js not found in extracted archive: {bootstrap}")
+        patch_bootstrap(bootstrap)
+        run_node(PACK_ASAR, str(unpack_dir), str(asar))
+
+    header_hash = run_node(HASH_ASAR, str(asar), capture=True)
+    header_hash_out.append(header_hash)
+
+    account_home = Path.home() / f".codex-{slugify(account)}"
+    user_data_dir = Path.home() / "Library" / "Application Support" / support_name_from_label(label)
+
+    patch_info_plist(
+        plist_path,
+        bundle_id=bundle_id,
+        label=label,
+        user_data_dir=user_data_dir,
+        account_home=account_home,
+        header_hash=header_hash,
+        dock_badge=dock_badge,
+    )
+    install_icon(app_path, icon_png, icon_icns)
+    run(["codesign", "--force", "--deep", "--sign", "-", str(app_path)])
+    run(["touch", str(app_path)])
+
+
+def install_account(args: argparse.Namespace) -> None:
+    account = slugify(args.account)
+    label = args.label or default_label(account)
+    bundle_id = args.bundle_id or default_bundle_id(account)
+    dock_badge = args.dock_badge or default_dock_badge(account)
+    support_name = support_name_from_label(label)
+    bin_dir = Path(args.bin_dir).expanduser().resolve()
+    helper_path = bin_dir / "codex-account-home"
+    cli_launcher = bin_dir / f"codex-{account}"
+    dest_app_dir = Path(args.dest_app_dir).expanduser().resolve()
+    dest_app = dest_app_dir / f"{label}.app"
+    app_launcher = bin_dir / f"codex-app-{account}"
+    source_app = Path(args.source_app).expanduser().resolve()
+    icon_png = Path(args.icon_png).expanduser().resolve() if args.icon_png else None
+    icon_icns = Path(args.icon_icns).expanduser().resolve() if args.icon_icns else None
+
+    modes = set()
+    if args.cli:
+        modes.add("cli")
+    if args.app:
+        modes.add("app")
+    if not modes:
+        modes = {"cli", "app"}
+
+    if "cli" in modes or "app" in modes:
+        bin_dir.mkdir(parents=True, exist_ok=True)
+        write_text_executable(helper_path, helper_script_contents(bin_dir))
+
+    if "cli" in modes:
+        write_text_executable(cli_launcher, cli_launcher_contents(helper_path, account, support_name, label, dock_badge))
+
+    if "app" in modes:
+        require_tool("node")
+        require_tool("codesign")
+
+        if not source_app.exists():
+            fail(f"source app not found: {source_app}")
+        if not (source_app / "Contents" / "Resources" / "app.asar").exists():
+            fail(f"not a valid Codex.app bundle: {source_app}")
+        if icon_png and not icon_png.exists():
+            fail(f"icon png not found: {icon_png}")
+        if icon_icns and not icon_icns.exists():
+            fail(f"icon icns not found: {icon_icns}")
+
+        if args.force or not dest_app.exists():
+            copy_app(source_app, dest_app)
+
+        hashes: list[str] = []
+        patch_app_clone(
+            app_path=dest_app,
+            bundle_id=bundle_id,
+            label=label,
+            account=account,
+            header_hash_out=hashes,
+            dock_badge=dock_badge,
+            icon_png=icon_png,
+            icon_icns=icon_icns,
+        )
+        write_text_executable(app_launcher, app_launcher_contents(helper_path, account, support_name, label, dock_badge, dest_app))
+
+    print(f"installed account: {account}")
+    if "cli" in modes:
+        print(f"  cli launcher: {cli_launcher}")
+    if "app" in modes:
+        print(f"  app clone: {dest_app}")
+        print(f"  app launcher: {app_launcher}")
+        print("  note: if Dock still shows an old icon, remove and re-pin the cloned app once")
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="codex-multi-account",
+        description="Install shareable multi-account launchers for Codex CLI and Codex desktop app.",
+    )
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    install = sub.add_parser("install", help="Install or update one Codex account profile")
+    install.add_argument("account", help="Account slug, for example: personal, work, lab")
+    install.add_argument("--cli", action="store_true", help="Install only the CLI launcher")
+    install.add_argument("--app", action="store_true", help="Install only the desktop app launcher")
+    install.add_argument("--force", action="store_true", help="Re-copy the app bundle from the source app before patching")
+    install.add_argument("--label", help="Desktop label, default: Codex <Account>")
+    install.add_argument("--bundle-id", help="Desktop bundle identifier, default: local.codex.<account>.app")
+    install.add_argument("--dock-badge", help="Single-letter Dock badge override")
+    install.add_argument("--source-app", default="/Applications/Codex.app", help="Source Codex.app bundle")
+    install.add_argument("--dest-app-dir", default="~/Applications", help="Where cloned app bundles are written")
+    install.add_argument("--bin-dir", default="~/.local/bin", help="Where CLI launchers are written")
+    install.add_argument("--icon-png", help="Optional PNG icon to convert into electron.icns")
+    install.add_argument("--icon-icns", help="Optional ICNS icon to copy into the cloned app")
+
+    return parser
+
+
+def main() -> None:
+    parser = build_parser()
+    args = parser.parse_args()
+
+    if args.command == "install":
+        install_account(args)
+        return
+
+    fail(f"unknown command: {args.command}")
+
+
+if __name__ == "__main__":
+    main()

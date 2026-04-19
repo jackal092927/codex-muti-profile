@@ -1,0 +1,10 @@
+{
+  "name": "codex-multi-account",
+  "description": "Shareable multi-account launchers for Codex CLI and Codex.app on macOS",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "help": "./bin/codex-multi-account --help"
+  }
+}
